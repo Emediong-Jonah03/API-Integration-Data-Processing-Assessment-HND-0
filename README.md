@@ -13,7 +13,7 @@ The endpoint accepts a name as a query parameter, calls the Genderize API, proce
 ## Base URL
 
 ```
-https://api-integration-data-processing-assessment-hnd-0-production.up.railway.app
+https://emedevHNG0.vercel.app
 ```
 
 ---
