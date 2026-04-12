@@ -25,13 +25,9 @@ async def get_data(name: str):
     except httpx.HTTPStatusException:
         return JSONResponse(status_code=500, content={
             "status": "error",
-            "message": "Internal Server Error"
+            "message": "Server Failure"
         })
-    except httpx.TimeoutException:
-        return JSONResponse(status_code=502, content={
-            "status": "error",
-            "message": "Bad Gateway"
-        })
+
 
 
 @app.get("/api/classify")
@@ -40,14 +36,14 @@ async def classify_name(name: str = Query(default=None)):
     if name is None or name.strip() == "":
         return JSONResponse(status_code=400, content={
             "status": "error",
-            "message": "Bad Request"
+            "message": "Missing or empty name parameter"
         })
 
     try:
         float(name) 
         return JSONResponse(status_code=422, content={
             "status": "error",
-            "message": "Unprocessable Entity"
+            "message": "name is not a string"
         })
     except ValueError:
         pass
