@@ -6,12 +6,16 @@ import httpx
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def cors_response(status_code: int, content: dict):
+    response = JSONResponse(status_code=status_code, content=content)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
+
+@app.options("/api/classify")
+async def options():
+    return cors_response(200, {})
 
 async def get_data(name: str):
     try:
@@ -51,6 +55,7 @@ async def classify_name(name: str = Query(default=None)):
     data = await get_data(name)
 
     if isinstance(data, JSONResponse):
+        data.headers["Access-Control-Allow-Origin"] = "*"
         return data
 
     if data.get("gender") is None or data.get("count", 0) == 0:
