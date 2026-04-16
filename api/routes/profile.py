@@ -1,0 +1,28 @@
+from fastapi import APIRouter, Request, Query
+from services.create_profile_service import api_profiles_post
+from services.get_profile import get_all_profiles, get_profile_by_id
+from services.delete_profile import delete_profile
+
+profileRouter = APIRouter()
+
+@profileRouter.post("/", status_code=201)
+async def api_profiles(name: str = Query(None)):
+    return await api_profiles_post(name)
+    
+
+@profileRouter.get("/")
+async def api_profiles_get(
+    gender: str = Query(None),
+    country_id: str = Query(None),
+    age_group: str = Query(None),
+):
+    return await get_all_profiles(gender, country_id, age_group)
+
+@profileRouter.get("/{id}")
+async def api_profiles_get_by_id(id: str):
+    return await get_profile_by_id(id)
+
+@profileRouter.delete("/{id}", status_code=204)
+async def api_profiles_delete(id: str):
+    return await delete_profile(id)
+            

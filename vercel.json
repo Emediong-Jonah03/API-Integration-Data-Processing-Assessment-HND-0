@@ -1,14 +1,10 @@
 {
-    "builds": [
-        {
-            "src": "main.py",
-            "use": "@vercel/python"
+    "buildCommand": "pip install -r requirements.txt",
+    "outputDirectory": ".",
+    "framework": "python",
+    "functions": {
+        "api/*.py": {
+            "runtime": "python3.12"
         }
-    ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "main.py"
-        }
-    ]
+    }
 }
