@@ -3,10 +3,10 @@ from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
 from api.api_url import get_data
 from pydantic import BaseModel
-from routes.profile import profileRouter
-from middleware.validate_name import validate_name
+from api.routes.profile import profileRouter
+from api.middleware.validate_name import validate_name
 from fastapi.middleware.cors import CORSMiddleware
-from database.db import create_pool, close_pool
+from api.database.db import create_pool, close_pool
 from contextlib import asynccontextmanager
 from mangum import Mangum
 
