@@ -8,7 +8,6 @@ from middleware.validate_name import validate_name
 from fastapi.middleware.cors import CORSMiddleware
 from database.db import create_pool, close_pool
 from contextlib import asynccontextmanager
-from mangum import Mangum
 
 class Profile(BaseModel):
     gender: str
@@ -27,7 +26,6 @@ async def lifespan(app: FastAPI):
     print("DB closed")
 
 app = FastAPI(lifespan=lifespan)
-handler = Mangum(app)
 
 app.add_middleware(
     CORSMiddleware,
