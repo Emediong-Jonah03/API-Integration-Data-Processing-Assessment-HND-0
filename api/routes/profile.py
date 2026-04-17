@@ -4,7 +4,7 @@ from api.services.get_profile import get_all_profiles, get_profile_by_id
 from api.services.delete_profile import delete_profile
 from pydantic import BaseModel
 
-profileRouter = APIRouter()
+profileRouter = APIRouter(redirect_slashes=False)
 
 class ProfileRequest(BaseModel):
     name: str
