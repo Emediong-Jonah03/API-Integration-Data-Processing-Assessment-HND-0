@@ -1,0 +1,12 @@
+-- Active: 1776265585869@@127.0.0.1@5302
+[project]
+name = "fastapi-vercel-app"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.104.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
