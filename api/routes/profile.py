@@ -2,13 +2,17 @@ from fastapi import APIRouter, Request, Query
 from api.services.create_profile_service import api_profiles_post
 from api.services.get_profile import get_all_profiles, get_profile_by_id
 from api.services.delete_profile import delete_profile
+from pydantic import BaseModel
 
 profileRouter = APIRouter()
 
+class ProfileRequest(BaseModel):
+    name: str
+
 @profileRouter.post("/", status_code=201)
-async def api_profiles(name: str = Query(None)):
-    return await api_profiles_post(name)
-    
+async def api_profiles(body: ProfileRequest):
+    return await api_profiles_post(body.name)
+
 
 @profileRouter.get("/")
 async def api_profiles_get(

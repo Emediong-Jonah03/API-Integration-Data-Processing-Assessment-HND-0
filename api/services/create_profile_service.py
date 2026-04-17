@@ -1,4 +1,4 @@
-from fastapi import Query, Request, Response, status
+from fastapi import Query, HTTPException
 from api.request_func.genderize import gender_profile
 from api.request_func.agify import agify_profile
 from api.request_func.nationalize import nationalize_profile
@@ -27,8 +27,7 @@ def format_profile(profile):
 async def api_profiles_post(
     name: str = Query(None)
 ):
-    if validate_name(name):
-        return validate_name(name)
+    validate_name(name)
 
     normalised_name = name.strip().lower()
 
@@ -49,11 +48,19 @@ async def api_profiles_post(
                 "data": format_profile(existing_profile)
             }
     
+
     gender_data, age_data, nat_data = await asyncio.gather(
         gender_profile(normalised_name),
         agify_profile(normalised_name),
         nationalize_profile(normalised_name)
     )
+
+    if gender_data.get("gender") is None or gender_data.get("sample_size", 0) == 0:
+        raise HTTPException(status_code=502, detail={"status": "502", "message": "Genderize returned an invalid response"})
+    if age_data.get("age") is None:
+        raise HTTPException(status_code=502, detail={"status": "502", "message": "Agify returned an invalid response"})
+    if not nat_data.get("country_id"):
+        raise HTTPException(status_code=502, detail={"status": "502", "message": "Nationalize returned an invalid response"})
 
     profile = {
         "id": str(uuid7()),
