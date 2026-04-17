@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
-from api_url import get_data
+from api.api_url import get_data
 from pydantic import BaseModel
 from routes.profile import profileRouter
 from middleware.validate_name import validate_name
