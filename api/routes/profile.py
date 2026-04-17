@@ -7,9 +7,12 @@ from pydantic import BaseModel
 profileRouter = APIRouter(redirect_slashes=False)
 
 
+class ProfileRequest(BaseModel):
+    name: str
+
 @profileRouter.post("/", status_code=201)
-async def api_profiles(name: str = Query(...)):
-    return await api_profiles_post(name)
+async def api_profiles(body: ProfileRequest):
+    return await api_profiles_post(body.name)
 
 
 @profileRouter.get("/")
