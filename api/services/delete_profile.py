@@ -1,4 +1,4 @@
-from database import db
+from api.database import db
 
 async def delete_profile(id: str):
     async with db.pool.acquire() as conn:

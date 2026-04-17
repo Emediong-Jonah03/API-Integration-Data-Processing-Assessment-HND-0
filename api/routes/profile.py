@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Query
-from services.create_profile_service import api_profiles_post
-from services.get_profile import get_all_profiles, get_profile_by_id
-from services.delete_profile import delete_profile
+from api.services.create_profile_service import api_profiles_post
+from api.services.get_profile import get_all_profiles, get_profile_by_id
+from api.services.delete_profile import delete_profile
 
 profileRouter = APIRouter()
 

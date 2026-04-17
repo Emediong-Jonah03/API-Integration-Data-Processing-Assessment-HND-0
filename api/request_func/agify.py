@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ValidationError
-from api_url import get_data
+from api.api_url import get_data
 from typing import Optional
 
 class Agify(BaseModel):

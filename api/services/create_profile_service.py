@@ -1,11 +1,11 @@
 from fastapi import Query, Request, Response, status
-from request_func.genderize import gender_profile
-from request_func.agify import agify_profile
-from request_func.nationalize import nationalize_profile
-from middleware.validate_name import validate_name
+from api.request_func.genderize import gender_profile
+from api.request_func.agify import agify_profile
+from api.request_func.nationalize import nationalize_profile
+from api.middleware.validate_name import validate_name
 from uuid6 import uuid7
 from datetime import datetime, timezone
-from database import db
+from api.database import db
 import asyncio
 
 

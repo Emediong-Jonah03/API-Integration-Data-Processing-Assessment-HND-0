@@ -1,4 +1,4 @@
-from api_url import get_data
+from api.api_url import get_data
 
 async def nationalize_profile(name: str):
     data = await get_data(name)

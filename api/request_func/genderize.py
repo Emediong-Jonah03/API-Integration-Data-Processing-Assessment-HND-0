@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-from api_url import get_data
+from api.api_url import get_data
 
 class Genderize(BaseModel):
     gender: Optional[str]
