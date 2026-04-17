@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.pool = await close_pool()
     print("DB closed")
 
-app = FastAPI(lifespan=lifespan, redirect_slashes=False)
+app = FastAPI(lifespan=lifespan)
 handler = Mangum(app)
 
 app.add_middleware(
