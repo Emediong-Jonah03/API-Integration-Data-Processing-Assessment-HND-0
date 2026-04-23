@@ -1,11 +1,24 @@
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+
 from fastapi import Query, HTTPException
-from api.request_func.genderize import gender_profile
-from api.request_func.agify import agify_profile
-from api.request_func.nationalize import nationalize_profile
-from api.middleware.validate_name import validate_name
+if os.getenv("MODULE_ENV") == 'development':
+    from request_func.genderize import gender_profile
+    from request_func.agify import agify_profile
+    from request_func.nationalize import nationalize_profile
+    from middleware.validate_name import validate_name
+    from database import db
+else:
+    from api.request_func.genderize import gender_profile
+    from api.request_func.agify import agify_profile
+    from api.request_func.nationalize import nationalize_profile
+    from api.middleware.validate_name import validate_name
+    from api.database import db
+
 from uuid6 import uuid7
 from datetime import datetime, timezone
-from api.database import db
 import asyncio
 
 

@@ -1,12 +1,25 @@
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
-from api.api_url import get_data
+
+if os.getenv("MODULE_ENV") == 'development':
+    from api_url import get_data
+    from routes.profile import profileRouter
+    from middleware.validate_name import validate_name
+    from database.db import create_pool, close_pool
+
+else:
+    from api.routes.profile import profileRouter
+    from api.middleware.validate_name import validate_name
+    from api.database.db import create_pool, close_pool
+    from api.api_url import get_data
+
 from pydantic import BaseModel
-from api.routes.profile import profileRouter
-from api.middleware.validate_name import validate_name
 from fastapi.middleware.cors import CORSMiddleware
-from api.database.db import create_pool, close_pool
 from contextlib import asynccontextmanager
 from mangum import Mangum
 

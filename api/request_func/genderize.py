@@ -1,11 +1,20 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from pydantic import BaseModel
 from typing import Optional
-from api.api_url import get_data
 
+if os.getenv("MODULE_ENV") == 'development':
+    from api_url import get_data
+else :
+    from api.api_url import get_data
 class Genderize(BaseModel):
     gender: Optional[str]
     probability: Optional[float] = 0
     count: Optional[int] = 0
+
 
 async def gender_profile(name: str): 
     data = await get_data(name)

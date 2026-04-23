@@ -1,4 +1,11 @@
-from api.database import db
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+if os.getenv("MODULE_ENV") == 'development':
+    from database import db
+else:
+    from api.database import db
 
 async def delete_profile(id: str):
     async with db.pool.acquire() as conn:

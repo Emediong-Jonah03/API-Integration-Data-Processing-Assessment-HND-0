@@ -1,4 +1,12 @@
-from api.api_url import get_data
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if os.getenv("MODULE_ENV") == 'development':
+    from api_url import get_data
+else:
+     from api.api_url import get_data
 
 async def nationalize_profile(name: str):
     data = await get_data(name)

@@ -11,7 +11,6 @@ async def create_pool():
         dsn=os.getenv("DATABASE_URL"),
         min_size=1,
         max_size=10,
-        ssl="require"
     )
 
 

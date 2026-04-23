@@ -1,5 +1,14 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if os.getenv("MODULE_ENV") == 'development':
+    from api_url import get_data
+else:
+    from api.api_url import get_data
+
 from pydantic import BaseModel, ValidationError
-from api.api_url import get_data
 from typing import Optional
 
 class Agify(BaseModel):
