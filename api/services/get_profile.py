@@ -5,7 +5,7 @@ load_dotenv()
 if os.getenv("MODULE_ENV") == 'development':
     from database import db
 else:
-    from database import db
+    from api.database import db
 
 from uuid import UUID
 
