@@ -29,6 +29,8 @@ router = APIRouter(tags=["auth"])
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+GITHUB_CLI_CLIENT_ID = os.getenv("GITHUB_CLI_CLIENT_ID")
+GITHUB_CLI_CLIENT_SECRET = os.getenv("GITHUB_CLI_CLIENT_SECRET")
 GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
 
 pkce_store: dict = {}
@@ -45,13 +47,15 @@ async def github_login(
     pkce_store[state] = {"challenge": code_challenge, "source": source}
 
     if source == "cli":
+        client_id = GITHUB_CLI_CLIENT_ID
         redirect_uri = "http://localhost:8080/callback"
     else:
+        client_id = GITHUB_CLIENT_ID
         redirect_uri = GITHUB_REDIRECT_URI
 
     url = (
         f"https://github.com/login/oauth/authorize"
-        f"?client_id={GITHUB_CLIENT_ID}"
+        f"?client_id={client_id}"
         f"&redirect_uri={redirect_uri}"
         f"&scope=read:user user:email"
         f"&state={state}"
@@ -86,26 +90,29 @@ async def github_callback(
         raise HTTPException(400, detail={"status": "error", "message": "PKCE verification failed"})
 
     if source == "cli":
+        client_id = GITHUB_CLI_CLIENT_ID
+        client_secret = GITHUB_CLI_CLIENT_SECRET
         redirect_uri = "http://localhost:8080/callback"
     else:
+        client_id = GITHUB_CLIENT_ID
+        client_secret = GITHUB_CLIENT_SECRET
         redirect_uri = GITHUB_REDIRECT_URI
 
     async with httpx.AsyncClient() as client:
         gh_resp = await client.post(
             "https://github.com/login/oauth/access_token",
             json={
-                "client_id": GITHUB_CLIENT_ID,
-                "client_secret": GITHUB_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": redirect_uri,
-            },
-            headers={"Accept": "application/json"},
-        )
-        gh_data = gh_resp.json()
+                "client_id": client_id,
+                "client_secret": client_secret,
+            "code": code,
+            "redirect_uri": redirect_uri,
+        },
+        headers={"Accept": "application/json"},
+    )
 
-    gh_access_token = gh_data.get("access_token")
+    gh_access_token = gh_resp.get("access_token")
     if not gh_access_token:
-        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_data}"})
+        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_resp}"})
 
     async with httpx.AsyncClient() as client:
         user_resp = await client.get(
