@@ -58,6 +58,6 @@ async def get_data(name: str):
             status_code=500,
             detail={
                 "status": "error",
-                "message": "Upstream or Server Failure"
+                "message": "Server Failure"
             }
         )

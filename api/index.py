@@ -2,44 +2,46 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from datetime import datetime, timezone
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from mangum import Mangum
+import time
+import logging
+from starlette_csrf import CSRFMiddleware
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 if os.getenv("MODULE_ENV") == 'development':
-    from api_url import get_data
     from routes.profile import profileRouter
     from middleware.validate_name import validate_name
     from database.db import create_pool, close_pool
-
+    from auth.router import auth_router
 else:
     from api.routes.profile import profileRouter
     from api.middleware.validate_name import validate_name
     from api.database.db import create_pool, close_pool
-    from api.api_url import get_data
-
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from mangum import Mangum
-
-class Profile(BaseModel):
-    gender: str
-    probability: float
-    sample_size: int
-    is_confident: bool
-    processed_at: str
+    from api.auth.router import auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.pool = await create_pool()
     print("DB connected")
-
     yield
     app.state.pool = await close_pool()
     print("DB closed")
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(CSRFMiddleware, secret=os.getenv("JWT_SECRET_KEY"))
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 handler = Mangum(app)
 
 app.add_middleware(
@@ -49,44 +51,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-    
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = round((time.time() - start) * 1000)
+    logger.info(f"{request.method} {request.url.path} {response.status_code} {duration}ms")
+    return response
+
 app.include_router(profileRouter, prefix="/api/profiles")
-
-@app.get("/api/classify")
-async def classify_name(name: str = Query(default=None)):
-
-    if validate_name(name):
-        return validate_name(name)
-
-    data = await get_data(name)
-
-    if isinstance(data, JSONResponse):
-        return data
-
-    if data['gender_data'].get("gender") is None or data['gender_data'].get("count", 0) == 0:
-        return JSONResponse(status_code=200, content={
-            "status": "error",
-            "message": "No prediction available for the provided name"
-        })
-
-    probability = data['gender_data']["probability"]
-    sample_size = data['gender_data']["count"]
-    is_confident = probability >= 0.7 and sample_size >= 100
-
-    return JSONResponse(status_code=200, content={
-        "status": "success",
-        "data": {
-            "name": data['gender_data']["name"],
-            "gender": data['gender_data']["gender"],
-            "probability": probability,
-            "sample_size": sample_size,
-            "is_confident": is_confident,
-            "processed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        }
-    })
-
-
-
-    
-   
-
+app.include_router(auth_router)

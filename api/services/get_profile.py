@@ -62,11 +62,21 @@ async def get_all_profiles(
             *params, limit, offset
         )
 
+    total_pages = (total + limit - 1) // limit if total > 0 else 0
+    base_url = f"/api/profiles"
+    query = f"page={{page}}&limit={limit}"
+
     return {
         "status": "success",
         "page": page,
         "limit": limit,
         "total": total,
+        "total_pages": total_pages,
+        "links": {
+            "self": f"{base_url}?{query.format(page=page)}",
+            "next": f"{base_url}?{query.format(page=page+1)}" if page < total_pages else None,
+            "prev": f"{base_url}?{query.format(page=page-1)}" if page > 1 else None,
+        },
         "data": [dict(r) for r in rows]
     }, None
 

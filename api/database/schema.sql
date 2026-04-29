@@ -14,3 +14,26 @@ CREATE TABLE profiles (
     ),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE users (
+    id TEXT PRIMARY KEY, -- UUID v7 as string
+    github_id VARCHAR UNIQUE NOT NULL,
+    username VARCHAR,
+    email VARCHAR,
+    avatar_url VARCHAR,
+    role VARCHAR DEFAULT 'analyst',
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    user_id TEXT REFERENCES users (id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW()
+);

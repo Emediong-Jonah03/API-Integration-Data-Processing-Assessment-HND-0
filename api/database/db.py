@@ -18,3 +18,7 @@ async def close_pool():
     global pool
     if pool:
         await pool.close()
+
+async def get_db():
+    async with pool.acquire() as conn:
+        yield conn
