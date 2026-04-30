@@ -36,6 +36,11 @@ GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
 pkce_store: dict = {}
 
 
+import json
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+
+# Remove pkce_store dict entirely
+
 @router.get("/auth/github")
 @limiter.limit("10/minute")
 async def github_login(
@@ -43,8 +48,9 @@ async def github_login(
     code_challenge: str = Query(...),
     source: str = Query(default="cli")
 ):
-    state = secrets.token_urlsafe(32)
-    pkce_store[state] = {"challenge": code_challenge, "source": source}
+    # Encode challenge + source into state
+    state_data = json.dumps({"challenge": code_challenge, "source": source})
+    state = urlsafe_b64encode(state_data.encode()).decode()
 
     if source == "cli":
         client_id = GITHUB_CLI_CLIENT_ID
@@ -72,13 +78,15 @@ async def github_callback(
     code_verifier: str = Query(...),
     db=Depends(get_db),
 ):
-    stored = pkce_store.pop(state, None)
-    if not stored:
-        raise HTTPException(400, detail={"status": "error", "message": "Invalid or expired state"})
+    # Decode state
+    try:
+        state_data = json.loads(urlsafe_b64decode(state.encode()).decode())
+        stored_challenge = state_data["challenge"]
+        source = state_data["source"]
+    except Exception:
+        raise HTTPException(400, detail={"status": "error", "message": "Invalid state"})
 
-    stored_challenge = stored["challenge"]
-    source = stored["source"]
-
+    # Verify PKCE
     computed_challenge = (
         base64.urlsafe_b64encode(
             hashlib.sha256(code_verifier.encode()).digest()
