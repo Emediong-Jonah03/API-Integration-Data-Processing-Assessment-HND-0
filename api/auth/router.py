@@ -104,15 +104,16 @@ async def github_callback(
             json={
                 "client_id": client_id,
                 "client_secret": client_secret,
-            "code": code,
-            "redirect_uri": redirect_uri,
-        },
-        headers={"Accept": "application/json"},
-    )
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Accept": "application/json"},
+        )
+        gh_data = gh_resp.json()
 
-    gh_access_token = gh_resp.get("access_token")
+    gh_access_token = gh_data.get("access_token")
     if not gh_access_token:
-        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_resp}"})
+        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_data}"})
 
     async with httpx.AsyncClient() as client:
         user_resp = await client.get(
