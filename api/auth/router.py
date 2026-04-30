@@ -46,10 +46,14 @@ from base64 import urlsafe_b64encode, urlsafe_b64decode
 async def github_login(
     request: Request,
     code_challenge: str = Query(...),
-    source: str = Query(default="cli")
+    source: str = Query(default="cli"),
+    code_verifier: str = Query(default=None),
 ):
-    # Encode challenge + source into state
-    state_data = json.dumps({"challenge": code_challenge, "source": source})
+    state_data = json.dumps({
+        "challenge": code_challenge,
+        "source": source,
+        "verifier": code_verifier or "",
+    })
     state = urlsafe_b64encode(state_data.encode()).decode()
 
     if source == "cli":
@@ -75,91 +79,29 @@ async def github_callback(
     request: Request,
     code: str = Query(...),
     state: str = Query(...),
-    code_verifier: str = Query(...),
+    code_verifier: str = Query(default=None),
     db=Depends(get_db),
 ):
-    # Decode state
     try:
         state_data = json.loads(urlsafe_b64decode(state.encode()).decode())
         stored_challenge = state_data["challenge"]
         source = state_data["source"]
+        state_verifier = state_data.get("verifier", "")
     except Exception:
         raise HTTPException(400, detail={"status": "error", "message": "Invalid state"})
 
-    # Verify PKCE
+    # CLI sends verifier as query param, web encodes it in state
+    final_verifier = code_verifier if source == "cli" else state_verifier
+
     computed_challenge = (
         base64.urlsafe_b64encode(
-            hashlib.sha256(code_verifier.encode()).digest()
+            hashlib.sha256(final_verifier.encode()).digest()
         )
         .rstrip(b"=")
         .decode()
     )
     if computed_challenge != stored_challenge:
         raise HTTPException(400, detail={"status": "error", "message": "PKCE verification failed"})
-
-    if source == "cli":
-        client_id = GITHUB_CLI_CLIENT_ID
-        client_secret = GITHUB_CLI_CLIENT_SECRET
-        redirect_uri = "http://localhost:8080/callback"
-    else:
-        client_id = GITHUB_CLIENT_ID
-        client_secret = GITHUB_CLIENT_SECRET
-        redirect_uri = GITHUB_REDIRECT_URI
-
-    async with httpx.AsyncClient() as client:
-        gh_resp = await client.post(
-            "https://github.com/login/oauth/access_token",
-            json={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "code": code,
-                "redirect_uri": redirect_uri,
-            },
-            headers={"Accept": "application/json"},
-        )
-        gh_data = gh_resp.json()
-
-    gh_access_token = gh_data.get("access_token")
-    if not gh_access_token:
-        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_data}"})
-
-    async with httpx.AsyncClient() as client:
-        user_resp = await client.get(
-            "https://api.github.com/user",
-            headers={
-                "Authorization": f"Bearer {gh_access_token}",
-                "Accept": "application/json",
-            },
-        )
-        github_user = user_resp.json()
-
-    user = await upsert_user(db, github_user)
-    if not user["is_active"]:
-        raise HTTPException(403, detail={"status": "error", "message": "Account is inactive"})
-
-    access_token = create_access_token({
-        "sub": str(user["id"]),
-        "role": user["role"],
-        "username": user["username"],
-    })
-    raw_refresh = generate_refresh_token()
-    await store_refresh_token(db, str(user["id"]), raw_refresh)
-
-    if source == "web":
-        web_url = os.getenv("WEB_URL", "http://localhost:5173")
-        redirect_response = RedirectResponse(f"{web_url}/dashboard")
-        redirect_response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="lax", max_age=180)
-        redirect_response.set_cookie(key="refresh_token", value=raw_refresh, httponly=True, samesite="lax", max_age=300)
-        return redirect_response
-
-    return {
-        "status": "success",
-        "access_token": access_token,
-        "refresh_token": raw_refresh,
-        "role": user["role"],
-        "username": user["username"],
-    }
-
 
 @router.post("/auth/refresh")
 @limiter.limit("10/minute")
