@@ -39,18 +39,20 @@ pkce_store: dict = {}
 import json
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 
-# Remove pkce_store dict entirely
-
 @router.get("/auth/github")
 @limiter.limit("10/minute")
 async def github_login(
     request: Request,
-    code_challenge: str = Query(...),
+    code_challenge: str = Query(default=None),
     source: str = Query(default="cli"),
     code_verifier: str = Query(default=None),
 ):
+    GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+    GITHUB_CLI_CLIENT_ID = os.getenv("GITHUB_CLI_CLIENT_ID")
+    GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
+
     state_data = json.dumps({
-        "challenge": code_challenge,
+        "challenge": code_challenge or "",
         "source": source,
         "verifier": code_verifier or "",
     })
@@ -89,6 +91,11 @@ async def github_callback(
         state_verifier = state_data.get("verifier", "")
     except Exception:
         raise HTTPException(400, detail={"status": "error", "message": "Invalid state"})
+
+    if not code:
+        raise HTTPException(400, detail={"status": "error", "message": "code is required"})
+    if not state:
+        raise HTTPException(400, detail={"status": "error", "message": "state is required"})
 
     # CLI sends verifier as query param, web encodes it in state
     final_verifier = code_verifier if source == "cli" else state_verifier

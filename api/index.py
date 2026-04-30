@@ -3,7 +3,6 @@ import os
 load_dotenv()
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -12,7 +11,6 @@ from contextlib import asynccontextmanager
 from mangum import Mangum
 import time
 import logging
-from starlette_csrf import CSRFMiddleware
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -39,7 +37,6 @@ async def lifespan(app: FastAPI):
     print("DB closed")
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(CSRFMiddleware, secret=os.getenv("JWT_SECRET_KEY"))
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 handler = Mangum(app)
@@ -49,6 +46,8 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
+    expose_headers=["*"],
 )
 
 @app.middleware("http")
