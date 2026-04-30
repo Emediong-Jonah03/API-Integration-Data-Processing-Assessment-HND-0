@@ -3,6 +3,7 @@ import os
 load_dotenv()
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -19,11 +20,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 if os.getenv("MODULE_ENV") == 'development':
     from routes.profile import profileRouter
+    from routes.users import usersRouter
     from middleware.validate_name import validate_name
     from database.db import create_pool, close_pool
     from auth.router import auth_router
 else:
     from api.routes.profile import profileRouter
+    from api.routes.users import usersRouter
     from api.middleware.validate_name import validate_name
     from api.database.db import create_pool, close_pool
     from api.auth.router import auth_router
@@ -59,4 +62,5 @@ async def log_requests(request: Request, call_next):
     return response
 
 app.include_router(profileRouter, prefix="/api/profiles")
+app.include_router(usersRouter, prefix="/api")
 app.include_router(auth_router)

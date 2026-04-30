@@ -3,6 +3,8 @@ import base64
 import os
 import secrets
 import httpx
+import json
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 
 from fastapi import APIRouter, Query, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
@@ -27,20 +29,9 @@ else:
 
 router = APIRouter(tags=["auth"])
 
-GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
-GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-GITHUB_CLI_CLIENT_ID = os.getenv("GITHUB_CLI_CLIENT_ID")
-GITHUB_CLI_CLIENT_SECRET = os.getenv("GITHUB_CLI_CLIENT_SECRET")
-GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
-
-pkce_store: dict = {}
-
-
-import json
-from base64 import urlsafe_b64encode, urlsafe_b64decode
 
 @router.get("/auth/github")
-@limiter.limit("10/minute")
+@limiter.limit("100/minute")
 async def github_login(
     request: Request,
     code_challenge: str = Query(default=None),
@@ -76,14 +67,19 @@ async def github_login(
 
 
 @router.get("/auth/github/callback")
-@limiter.limit("10/minute")
+@limiter.limit("100/minute")
 async def github_callback(
     request: Request,
-    code: str = Query(...),
-    state: str = Query(...),
+    code: str = Query(default=None),
+    state: str = Query(default=None),
     code_verifier: str = Query(default=None),
     db=Depends(get_db),
 ):
+    if not code:
+        raise HTTPException(400, detail={"status": "error", "message": "code is required"})
+    if not state:
+        raise HTTPException(400, detail={"status": "error", "message": "state is required"})
+
     try:
         state_data = json.loads(urlsafe_b64decode(state.encode()).decode())
         stored_challenge = state_data["challenge"]
@@ -92,27 +88,95 @@ async def github_callback(
     except Exception:
         raise HTTPException(400, detail={"status": "error", "message": "Invalid state"})
 
-    if not code:
-        raise HTTPException(400, detail={"status": "error", "message": "code is required"})
-    if not state:
-        raise HTTPException(400, detail={"status": "error", "message": "state is required"})
+    GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+    GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+    GITHUB_CLI_CLIENT_ID = os.getenv("GITHUB_CLI_CLIENT_ID")
+    GITHUB_CLI_CLIENT_SECRET = os.getenv("GITHUB_CLI_CLIENT_SECRET")
+    GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI")
 
-    # CLI sends verifier as query param, web encodes it in state
     final_verifier = code_verifier if source == "cli" else state_verifier
 
-    computed_challenge = (
-        base64.urlsafe_b64encode(
-            hashlib.sha256(final_verifier.encode()).digest()
+    if stored_challenge and final_verifier:
+        computed_challenge = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(final_verifier.encode()).digest()
+            )
+            .rstrip(b"=")
+            .decode()
         )
-        .rstrip(b"=")
-        .decode()
-    )
-    if computed_challenge != stored_challenge:
-        raise HTTPException(400, detail={"status": "error", "message": "PKCE verification failed"})
+        if computed_challenge != stored_challenge:
+            raise HTTPException(400, detail={"status": "error", "message": "PKCE verification failed"})
+
+    if source == "cli":
+        client_id = GITHUB_CLI_CLIENT_ID
+        client_secret = GITHUB_CLI_CLIENT_SECRET
+        redirect_uri = "http://localhost:8080/callback"
+    else:
+        client_id = GITHUB_CLIENT_ID
+        client_secret = GITHUB_CLIENT_SECRET
+        redirect_uri = GITHUB_REDIRECT_URI
+
+    async with httpx.AsyncClient() as client:
+        gh_resp = await client.post(
+            "https://github.com/login/oauth/access_token",
+            json={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Accept": "application/json"},
+        )
+        gh_data = gh_resp.json()
+
+    gh_access_token = gh_data.get("access_token")
+    if not gh_access_token:
+        raise HTTPException(400, detail={"status": "error", "message": f"GitHub token exchange failed: {gh_data}"})
+
+    async with httpx.AsyncClient() as client:
+        user_resp = await client.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {gh_access_token}",
+                "Accept": "application/json",
+            },
+        )
+        github_user = user_resp.json()
+
+    user = await upsert_user(db, github_user)
+    if not user["is_active"]:
+        raise HTTPException(403, detail={"status": "error", "message": "Account is inactive"})
+
+    access_token = create_access_token({
+        "sub": str(user["id"]),
+        "role": user["role"],
+        "username": user["username"],
+    })
+    raw_refresh = generate_refresh_token()
+    await store_refresh_token(db, str(user["id"]), raw_refresh)
+
+    if source == "web":
+        web_url = os.getenv("WEB_URL", "http://localhost:5173")
+        redirect_response = RedirectResponse(f"{web_url}/dashboard")
+        redirect_response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="lax", max_age=180)
+        redirect_response.set_cookie(key="refresh_token", value=raw_refresh, httponly=True, samesite="lax", max_age=300)
+        return redirect_response
+
+    return {
+        "status": "success",
+        "access_token": access_token,
+        "refresh_token": raw_refresh,
+        "role": user["role"],
+        "username": user["username"],
+    }
+
 
 @router.post("/auth/refresh")
-@limiter.limit("10/minute")
-async def refresh_token(request: Request, body: dict, db=Depends(get_db)):
+@limiter.limit("100/minute")
+async def refresh_token(request: Request, body: dict = None, db=Depends(get_db)):
+    if not body:
+        raise HTTPException(400, detail={"status": "error", "message": "refresh_token required"})
+
     old_refresh = body.get("refresh_token")
     if not old_refresh:
         raise HTTPException(400, detail={"status": "error", "message": "refresh_token required"})
@@ -144,8 +208,11 @@ async def refresh_token(request: Request, body: dict, db=Depends(get_db)):
 
 
 @router.post("/auth/logout")
-@limiter.limit("10/minute")
-async def logout(request: Request, body: dict, db=Depends(get_db)):
+@limiter.limit("100/minute")
+async def logout(request: Request, body: dict = None, db=Depends(get_db)):
+    if not body:
+        raise HTTPException(400, detail={"status": "error", "message": "refresh_token required"})
+
     refresh = body.get("refresh_token")
     if not refresh:
         raise HTTPException(400, detail={"status": "error", "message": "refresh_token required"})
